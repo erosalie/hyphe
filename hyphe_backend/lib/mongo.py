@@ -6,7 +6,7 @@ import msgpack
 from bson.binary import Binary
 from uuid import uuid1 as uuid
 from twisted.internet.defer import inlineCallbacks, returnValue as returnD
-from txmongo import MongoConnection, connection as mongo_connection
+from txmongo import MongoConnection, ConnectionPool, connection as mongo_connection
 mongo_connection._Pinger.noisy = False
 mongo_connection._Connection.noisy = False
 from txmongo.filter import TEXT as textIndex, sort as mongosort, ASCENDING, DESCENDING
@@ -25,10 +25,32 @@ def sortdesc(field):
 class MongoDB(object):
 
     def __init__(self, conf, pool=25):
-        self.host = environ.get('HYPHE_MONGODB_HOST', conf.get("host", conf.get("mongo_host", "localhost")))
-        self.port = int(environ.get('HYPHE_MONGODB_PORT', conf.get("port", conf.get("mongo_port", 27017))))
-        self.dbname = conf.get("db_name", conf.get("project", "hyphe"))
-        self.conn = MongoConnection(self.host, self.port, pool_size=pool)
+        # Check for connection string first
+        connection_string = environ.get('HYPHE_MONGODB_CONNECTION_STRING')
+        
+        if connection_string:
+            # Use connection string directly with ConnectionPool
+            self.conn = ConnectionPool(connection_string, pool_size=pool)
+            # Extract database name from connection string or use config
+            self.dbname = conf.get("db_name", conf.get("project", "hyphe"))
+            # Parse host/port for backward compatibility (used in logging)
+            try:
+                try:
+                    from urllib.parse import urlparse  # Python 3
+                except ImportError:
+                    from urlparse import urlparse  # Python 2
+                parsed = urlparse(connection_string)
+                self.host = parsed.hostname or "unknown"
+                self.port = parsed.port or 27017
+            except:
+                self.host = "from_connection_string"
+                self.port = 27017
+        else:
+            # Fall back to host/port configuration
+            self.host = environ.get('HYPHE_MONGODB_HOST', conf.get("host", conf.get("mongo_host", "localhost")))
+            self.port = int(environ.get('HYPHE_MONGODB_PORT', conf.get("port", conf.get("mongo_port", 27017))))
+            self.dbname = conf.get("db_name", conf.get("project", "hyphe"))
+            self.conn = MongoConnection(self.host, self.port, pool_size=pool)
 
     def db(self, corpus=None):
         if not corpus:

@@ -63,7 +63,13 @@ def load_config():
 
   # Test MongoDB server
     mongoconf = conf['mongo-scrapy']
-    db = MongoClient(os.environ.get('HYPHE_MONGODB_HOST', mongoconf['host']), int(os.environ.get('HYPHE_MONGODB_PORT', mongoconf['mongo_port'])))[mongoconf.get('db_name', mongoconf.get('project'))]
+    connection_string = os.environ.get('HYPHE_MONGODB_CONNECTION_STRING')
+    if connection_string:
+        # Use connection string
+        db = MongoClient(connection_string)[mongoconf.get('db_name', mongoconf.get('project'))]
+    else:
+        # Use host/port
+        db = MongoClient(os.environ.get('HYPHE_MONGODB_HOST', mongoconf['host']), int(os.environ.get('HYPHE_MONGODB_PORT', mongoconf['mongo_port'])))[mongoconf.get('db_name', mongoconf.get('project'))]
     try:
         test = list(db['%s.logs' % DEFAULT_CORPUS].find())
     except Exception as x:

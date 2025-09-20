@@ -34,6 +34,7 @@ if not path.exists(configfile):
 
 configdata = loadConfig(configfile)
 
+if "HYPHE_MONGODB_CONNECTION_STRING" in environ: setConfig("connection_string", environ["HYPHE_MONGODB_CONNECTION_STRING"],configdata,"mongo-scrapy")
 if "HYPHE_MONGODB_HOST"         in environ: setConfig("host", environ["HYPHE_MONGODB_HOST"],configdata,"mongo-scrapy")
 if "HYPHE_MONGODB_PORT"         in environ: setConfig("mongo_port", int(environ["HYPHE_MONGODB_PORT"]),configdata,"mongo-scrapy")
 if "HYPHE_MONGODB_DBNAME"       in environ: setConfig("db_name", environ["HYPHE_MONGODB_DBNAME"],configdata,"mongo-scrapy")
