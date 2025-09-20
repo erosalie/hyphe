@@ -1,7 +1,7 @@
 import logging
 
 from twisted.internet.defer import inlineCallbacks, returnValue
-from txmongo import MongoConnection, connection as mongo_connection
+from txmongo import MongoConnection, ConnectionPool, connection as mongo_connection
 mongo_connection._Connection.noisy = False
 from txmongo.filter import sort as mongosort, ASCENDING
 
@@ -21,8 +21,14 @@ class RemoveBody(object):
 
 class MongoOutput(object):
 
-    def __init__(self, host, port, db, queue_col, page_col, jobid):
-        store = MongoConnection(host, port)[db]
+    def __init__(self, host, port, db, queue_col, page_col, jobid, connection_string=None):
+        if connection_string:
+            # Use connection string directly
+            store = ConnectionPool(connection_string)[db]
+        else:
+            # Fall back to host/port
+            store = MongoConnection(host, port)[db]
+            
         self.jobid = jobid
         self.pageStore = store[page_col]
         self.queueStore = store[queue_col]
@@ -30,13 +36,15 @@ class MongoOutput(object):
 
     @classmethod
     def from_crawler(cls, crawler):
+        # Check for connection string first
+        connection_string = crawler.settings.get('MONGO_CONNECTION_STRING')
         host = crawler.settings['MONGO_HOST']
         port = crawler.settings['MONGO_PORT']
         db = crawler.settings['MONGO_DB']
         queue_col = crawler.settings['MONGO_QUEUE_COL']
         page_col = crawler.settings['MONGO_PAGESTORE_COL']
         jobid = crawler.settings['JOBID']
-        return cls(host, port, db, queue_col, page_col, jobid)
+        return cls(host, port, db, queue_col, page_col, jobid, connection_string=connection_string)
 
 
 class OutputQueue(MongoOutput):

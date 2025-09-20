@@ -76,6 +76,9 @@ try:
     config['mongo-scrapy']['project'] = project.lower()
     config['mongo-scrapy']['log_level'] = 'DEBUG' if config['DEBUG'] > 1 else 'INFO'
     config["mongo-scrapy"]["host"] = os.environ.get('HYPHE_MONGODB_HOST', config["mongo-scrapy"]["host"])
+    # Add connection string support
+    if 'HYPHE_MONGODB_CONNECTION_STRING' in os.environ:
+        config["mongo-scrapy"]["connection_string"] = os.environ['HYPHE_MONGODB_CONNECTION_STRING']
     config["mongo-scrapy"]["obey_robots"] = strToBool(os.environ.get('HYPHE_OBEY_ROBOTS', config["mongo-scrapy"].get("obey_robots", False)))
     config["mongo-scrapy"]["webarchives_password"] = os.environ.get('HYPHE_WEBARCHIVES_PASSWORD', config["webarchives"].get("password", ""))
     for _to in ["", "idle_", "ajax_"]:

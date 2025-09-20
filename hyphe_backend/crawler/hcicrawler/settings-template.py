@@ -39,6 +39,9 @@ MONGO_DB = '{{db_name}}_{{project}}'
 MONGO_JOBS_COL = 'jobs'
 MONGO_QUEUE_COL = 'queue'
 MONGO_PAGESTORE_COL = 'pages'
+{{#connection_string}}
+MONGO_CONNECTION_STRING = '{{connection_string}}'
+{{/connection_string}}
 
 WEBARCHIVES_PASSWORD = '{{webarchives_password}}'
 
