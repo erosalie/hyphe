@@ -3,7 +3,6 @@ volumes:
     archives:
     config:
     traph-data:
-    mongo-data:
     scrapyd-logs:
     scrapyd-eggs:
 services:
@@ -12,17 +11,14 @@ services:
     image: scpomedialab/hyphe_backend:${TAG}
     build: .
     links:
-     - "mongo:mongo"
      - "crawler:crawler"
     env_file:
      - config-backend.env
     environment:
-     - HYPHE_MONGODB_HOST=mongo
      - HYPHE_CRAWLER_HOST=crawler
      - HYPHE_TRAPH_DATAPATH=/app/traph-data
-     # Use HYPHE_MONGODB_CONNECTION_STRING for external MongoDB (Atlas, DocumentDB, etc.)
-     # Example: HYPHE_MONGODB_CONNECTION_STRING=mongodb+srv://user:pass@cluster.mongodb.net/hyphe
-     # - HYPHE_MONGODB_CONNECTION_STRING=
+     # External MongoDB connection string
+     - HYPHE_MONGODB_CONNECTION_STRING=${HYPHE_MONGODB_CONNECTION_STRING}
     volumes:
       - config:/app/config
       - ${DATA_PATH}archives:/app/archives
@@ -41,18 +37,10 @@ services:
     restart: "${RESTART_POLICY}"
     image: scpomedialab/hyphe_crawler:${TAG}
     build: ./hyphe_backend/crawler
-    links:
-      - "mongo:mongo"
     environment:
-      # Use HYPHE_MONGODB_CONNECTION_STRING for external MongoDB (Atlas, DocumentDB, etc.)
-      # Example: HYPHE_MONGODB_CONNECTION_STRING=mongodb+srv://user:pass@cluster.mongodb.net/hyphe
-      # - HYPHE_MONGODB_CONNECTION_STRING=
+      # External MongoDB connection string  
+      - HYPHE_MONGODB_CONNECTION_STRING=${HYPHE_MONGODB_CONNECTION_STRING}
     volumes:
       - ${DATA_PATH}scrapyd-logs:/var/log/scrapyd
       - ${DATA_PATH}scrapyd-eggs:/var/lib/scrapyd
-  mongo:
-    restart: "${RESTART_POLICY}"
-    image: mongo:3.6
-    volumes:
-      - ${DATA_PATH}mongo-data:/data/db
-    command: mongod --setParameter failIndexKeyTooLong=false --smallfiles
+  # Note: No local mongo service needed when using external MongoDB
