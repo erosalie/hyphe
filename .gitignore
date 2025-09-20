@@ -8,6 +8,7 @@ config-backend.env
 config-frontend.env
 hyphe-server.lock
 *.pyc
+__pycache__/
 pip-log.txt
 install.log
 archives/

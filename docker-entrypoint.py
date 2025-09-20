@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import json
-from os import environ,system,path
+import subprocess
+import sys
+from os import environ, path
 from ast import literal_eval
 from shutil import copyfile
 
@@ -21,6 +23,22 @@ def writeConfig(filename,configdata):
     with open(filename, 'w') as f:
        f.write(json.dumps(configdata, indent=2))
 
+def safe_literal_eval(value, default=None):
+    """Safely evaluate string literals with proper error handling"""
+    if not value:
+        return default
+    try:
+        result = literal_eval(value)
+        # Only allow safe types: list, dict, tuple, str, int, float, bool, None
+        if isinstance(result, (list, dict, tuple, str, int, float, bool, type(None))):
+            return result
+        else:
+            print(f"Warning: Unsafe type {type(result)} in environment variable, using default", file=sys.stderr)
+            return default
+    except (ValueError, SyntaxError) as e:
+        print(f"Warning: Invalid literal in environment variable: {e}, using default", file=sys.stderr)
+        return default
+
 def strToBool(string):
     if string in ["true", "True", "yes", "y", "1"]:
         return True
@@ -28,11 +46,9 @@ def strToBool(string):
         return False
 
 configfile = "/app/config/config.json"
-
 if not path.exists(configfile):
-    copyfile("/app/config.sample/config.json.example", configfile)
 
-configdata = loadConfig(configfile)
+    copyfile("/app/config.sample/config.json.example", configfile)
 
 if "HYPHE_MONGODB_CONNECTION_STRING" in environ: setConfig("connection_string", environ["HYPHE_MONGODB_CONNECTION_STRING"],configdata,"mongo-scrapy")
 if "HYPHE_MONGODB_HOST"         in environ: setConfig("host", environ["HYPHE_MONGODB_HOST"],configdata,"mongo-scrapy")
@@ -53,14 +69,14 @@ if "HYPHE_TRAPH_KEEPALIVE"      in environ: setConfig("keepalive", int(environ["
 if "HYPHE_TRAPH_DATAPATH"       in environ: setConfig("data_path", environ["HYPHE_TRAPH_DATAPATH"],configdata,"traph")
 if "HYPHE_TRAPH_MAX_SIM_PAGES"  in environ: setConfig("max_simul_pages_indexing", int(environ["HYPHE_TRAPH_MAX_SIM_PAGES"]),configdata,"traph")
 
-if "HYPHE_DEFAULT_STARTPAGES_MODE"  in environ: setConfig("defaultStartpagesMode", literal_eval(environ["HYPHE_DEFAULT_STARTPAGES_MODE"]),configdata)
+if "HYPHE_DEFAULT_STARTPAGES_MODE"  in environ: setConfig("defaultStartpagesMode", safe_literal_eval(environ["HYPHE_DEFAULT_STARTPAGES_MODE"], ["homepage", "prefixes", "pages-5"]),configdata)
 if "HYPHE_DEFAULT_CREATION_RULE"    in environ: setConfig("defaultCreationRule", environ["HYPHE_DEFAULT_CREATION_RULE"],configdata)
-if "HYPHE_CREATION_RULES"           in environ: setConfig("creationRules", literal_eval(environ["HYPHE_CREATION_RULES"]),configdata)
-if "HYPHE_FOLLOW_REDIRECTS"         in environ: setConfig("discoverPrefixes", literal_eval(environ["HYPHE_FOLLOW_REDIRECTS"]),configdata)
+if "HYPHE_CREATION_RULES"           in environ: setConfig("creationRules", safe_literal_eval(environ["HYPHE_CREATION_RULES"], {}),configdata)
+if "HYPHE_FOLLOW_REDIRECTS"         in environ: setConfig("discoverPrefixes", safe_literal_eval(environ["HYPHE_FOLLOW_REDIRECTS"], []),configdata)
 
 # TODO: Phantom config
 
-if "HYPHE_WEBARCHIVES_OPTIONS"   in environ: setConfig("options", literal_eval(environ["HYPHE_WEBARCHIVES_OPTIONS"] or '[]'),configdata, "webarchives")
+if "HYPHE_WEBARCHIVES_OPTIONS"   in environ: setConfig("options", safe_literal_eval(environ["HYPHE_WEBARCHIVES_OPTIONS"], []),configdata, "webarchives")
 if "HYPHE_WEBARCHIVES_DATE"      in environ: setConfig("date", environ["HYPHE_WEBARCHIVES_DATE"],configdata or "", "webarchives")
 if "HYPHE_WEBARCHIVES_DAYSRANGE" in environ: setConfig("days_range", int(environ["HYPHE_WEBARCHIVES_DAYSRANGE"] or 0),configdata, "webarchives")
 if "HYPHE_WEBARCHIVES_PASSWORD" in environ: setConfig("password", environ["HYPHE_WEBARCHIVES_PASSWORD"] or "",configdata, "webarchives")
@@ -71,4 +87,12 @@ if "HYPHE_DEBUG"           in environ: setConfig("DEBUG", int(environ["HYPHE_DEB
 
 writeConfig(configfile, configdata)
 
-system("/app/hyphe_backend/core.tac")
+# Use subprocess instead of os.system for security
+try:
+    subprocess.run(["/app/hyphe_backend/core.tac"], check=True)
+except subprocess.CalledProcessError as e:
+    print(f"Error starting hyphe backend: {e}", file=sys.stderr)
+    sys.exit(1)
+except FileNotFoundError:
+    print("Error: /app/hyphe_backend/core.tac not found", file=sys.stderr)
+    sys.exit(1)

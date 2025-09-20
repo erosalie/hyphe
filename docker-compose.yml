@@ -52,7 +52,9 @@ services:
       - ${DATA_PATH}scrapyd-eggs:/var/lib/scrapyd
   mongo:
     restart: "${RESTART_POLICY}"
-    image: mongo:3.6
+    # Updated to MongoDB 4.4 LTS - more secure and maintained than 3.6
+    image: mongo:4.4
     volumes:
       - ${DATA_PATH}mongo-data:/data/db
-    command: mongod --setParameter failIndexKeyTooLong=false --smallfiles
+    # Removed deprecated --smallfiles option, kept failIndexKeyTooLong for compatibility
+    command: mongod --setParameter failIndexKeyTooLong=false
