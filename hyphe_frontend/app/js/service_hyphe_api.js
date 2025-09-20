@@ -36,6 +36,8 @@ angular.module('hyphe.service_hyphe_api', [])
     API.WEBENTITY_PAGE_LIST_PAGINATE                = 'store.paginate_webentity_pages'
     API.WEBENTITY_PAGES_NETWORK_GET                 = 'store.get_webentity_pagelinks_network'
     API.WEBENTITY_PAGES_NETWORK_PAGINATE            = 'store.paginate_webentity_pagelinks_network'
+    API.PAGE_BACKLINKS_GET                          = 'store.get_page_backlinks'
+    API.WEBENTITY_BACKLINKS_GET                     = 'store.get_webentity_backlinks'
     API.WEBENTITY_SUBWEBENTITY_LIST_GET             = 'store.get_webentity_subwebentities'
     API.WEBENTITY_PARENTWEBENTITY_LIST_GET          = 'store.get_webentity_parentwebentities'
     API.WEBENTITY_EDIT                              = 'store.basic_edit_webentity'
@@ -334,6 +336,28 @@ angular.module('hyphe.service_hyphe_api', [])
               ,settings.count || 10
               ,settings.token || null
               ,settings.includeExternalLinks
+              ,corpus.getId()
+            ]}
+      )
+
+    ns.getPageBacklinks = buildApiCall(
+        API.PAGE_BACKLINKS_GET
+        ,function(settings){
+          return [
+              settings.url || null
+              ,settings.lru || null
+              ,settings.includePageMetas || false
+              ,corpus.getId()
+            ]}
+      )
+
+    ns.getWebentityBacklinks = buildApiCall(
+        API.WEBENTITY_BACKLINKS_GET
+        ,function(settings){
+          return [
+              settings.webentityId
+              ,settings.includePageMetas || false
+              ,settings.includeInternalLinks || false
               ,corpus.getId()
             ]}
       )

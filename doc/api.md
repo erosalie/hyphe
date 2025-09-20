@@ -1002,6 +1002,24 @@ The API will always answer as such:
 
  Returns for a `corpus` the list of all agregated weighted links between WebEntities.
 
+
+- __`get_page_backlinks`:__
+  + _`url`_ (optional, mutually exclusive with `lru`)
+  + _`lru`_ (optional, mutually exclusive with `url`)
+  + _`include_page_metas`_ (optional, default: `false`)
+  + _`corpus`_ (optional, default: `"--hyphe--"`)
+
+ Returns for a `corpus` all pages that link to the specified page URL or LRU. Either `url` or `lru` parameter must be provided. Optionally include page metadata when `include_page_metas` is set to "true".
+
+
+- __`get_webentity_backlinks`:__
+  + _`webentity_id`_ (mandatory)
+  + _`include_page_metas`_ (optional, default: `false`)
+  + _`include_internal_links`_ (optional, default: `false`)
+  + _`corpus`_ (optional, default: `"--hyphe--"`)
+
+ Returns for a `corpus` all pages that link to any page within the specified WebEntity. Set `include_internal_links` to "true" to also include internal links from within the same WebEntity. Optionally include page metadata when `include_page_metas` is set to "true".
+
 ### CREATION RULES
 
 - __`get_default_webentity_creationrule`:__
