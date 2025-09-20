@@ -1187,7 +1187,7 @@ class Crawler(customJSONRPC):
             returnD(format_result("Please start or create this corpus first"))
         # Write corpus TLDs for use in scrapyd egg
         with open(os.path.join("hyphe_backend", "crawler", "hcicrawler", "tlds_tree.py"), "wb") as tlds_file:
-            print >> tlds_file, "TLDS_TREE =", self.corpora[corpus].get("tlds", _tlds)
+            print("TLDS_TREE =", self.corpora[corpus].get("tlds", _tlds), file=tlds_file)
         output = subprocess.Popen([sys.executable, 'deploy.py', corpus], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd='hyphe_backend/crawler', env=os.environ).communicate()[0]
         res = yield self.crawlqueue.send_scrapy_query("listprojects")
         if is_error(res) or "projects" not in res or corpus_project(corpus) not in res['projects']:
@@ -1835,11 +1835,13 @@ class Memory_Structure(customJSONRPC):
             func = getattr(self, "jsonrpc_%s" % command)
         except Exception as e:
             returnD(format_error("ERROR: %s is not a valid store command" % command))
-        async = True
-        if "async" in kwargs:
-            async = test_bool_arg(kwargs.pop("async"))
+        async_mode = True
+        if "async_mode" in kwargs:
+            async_mode = test_bool_arg(kwargs.pop("async_mode"))
+        elif "async" in kwargs:
+            async_mode = test_bool_arg(kwargs.pop("async"))
         kwargs["corpus"] = corpus
-        if async:
+        if async_mode:
             results = yield DeferredList([func(webentity_id, *args, **kwargs) for webentity_id in webentity_ids], consumeErrors=True)
         else:
             results = []
@@ -2170,7 +2172,7 @@ class Memory_Structure(customJSONRPC):
 
     def jsonrpc_merge_webentities_into_another(self, old_webentity_ids, good_webentity_id, include_tags=False, include_home_and_startpages_as_startpages=False, corpus=DEFAULT_CORPUS):
         """Assembles for a `corpus` a bunch of WebEntities by deleting WebEntities defined by a list of `old_webentity_ids` and adding all of their LRU prefixes to the one defined by `good_webentity_id`. Optionally set `include_tags` and/or `include_home_and_startpages_as_startpages` to "true" to also add the tags and/or startpages to the merged resulting WebEntity."""
-        return self.batch_webentities_edit("merge_webentity_into_another", old_webentity_ids, corpus, good_webentity_id, include_tags=include_tags, include_home_and_startpages_as_startpages=include_home_and_startpages_as_startpages, async=False)
+        return self.batch_webentities_edit("merge_webentity_into_another", old_webentity_ids, corpus, good_webentity_id, include_tags=include_tags, include_home_and_startpages_as_startpages=include_home_and_startpages_as_startpages, async_mode=False)
 
     @inlineCallbacks
     def jsonrpc_delete_webentity(self, webentity_id, corpus=DEFAULT_CORPUS):
@@ -3304,7 +3306,98 @@ class Memory_Structure(customJSONRPC):
                     continue
                 res.append([source, target, weight])
         logger.msg("...JSON network generated in %ss" % str(time.time()-s), system="INFO - %s" % corpus)
-        returnD(handle_standard_results(res))
+        returnD(format_result(res))
+
+    @inlineCallbacks
+    def jsonrpc_get_page_backlinks(self, url=None, lru=None, include_page_metas=False, corpus=DEFAULT_CORPUS):
+        """Returns for a `corpus` all pages that link to the specified page URL or LRU. Optionally include page metadata when `include_page_metas` is set to "true"."""
+        if not self.parent.corpus_ready(corpus):
+            returnD(self.parent.corpus_error(corpus))
+        
+        if not url and not lru:
+            returnD(format_error("Either url or lru parameter must be provided"))
+        
+        # Convert URL to LRU if needed
+        if url and not lru:
+            try:
+                lru = urllru.url_to_lru(url)
+            except:
+                returnD(format_error("Invalid URL format: %s" % url))
+        
+        logger.msg("Finding backlinks for LRU: %s..." % lru, system="INFO - %s" % corpus)
+        
+        # Query pages that have this LRU in their lrulinks field
+        pages = yield self.db.pages(corpus).find({"lrulinks": lru})
+        
+        result_pages = []
+        for page in pages:
+            page_data = {
+                'url': page['url'],
+                'lru': page['lru']
+            }
+            if include_page_metas:
+                page_data.update({
+                    'status': page.get('status'),
+                    'crawl_timestamp': str(page.get('timestamp', '')),
+                    'depth': page.get('depth'),
+                    'content_type': page.get('content_type'),
+                    'size': page.get('size'),
+                    'encoding': page.get('encoding'),
+                    'error': page.get('error')
+                })
+            result_pages.append(page_data)
+        
+        logger.msg("...found %d backlinks" % len(result_pages), system="INFO - %s" % corpus)
+        returnD(format_result(result_pages))
+
+    @inlineCallbacks  
+    def jsonrpc_get_webentity_backlinks(self, webentity_id, include_page_metas=False, include_internal_links=False, corpus=DEFAULT_CORPUS):
+        """Returns for a `corpus` all pages that link to any page within the specified WebEntity. Set `include_internal_links` to "true" to also include internal links from within the same WebEntity. Optionally include page metadata when `include_page_metas` is set to "true"."""
+        if not self.parent.corpus_ready(corpus):
+            returnD(self.parent.corpus_error(corpus))
+        
+        # Get the WebEntity to find its prefixes
+        WE = yield self.db.get_WE(corpus, webentity_id)
+        if not WE:
+            returnD(format_error("No webentity found for id %s" % webentity_id))
+        
+        logger.msg("Finding backlinks for WebEntity %s..." % webentity_id, system="INFO - %s" % corpus)
+        
+        # Get all pages that belong to this WebEntity
+        we_pages = yield self.traphs.call(corpus, "get_webentity_pages", webentity_id, WE["prefixes"])
+        if is_error(we_pages):
+            returnD(we_pages)
+        
+        we_lrus = [page["lru"] for page in we_pages["result"]]
+        
+        # Query pages that have any of these LRUs in their lrulinks field
+        pages = yield self.db.pages(corpus).find({"lrulinks": {"$in": we_lrus}})
+        
+        result_pages = []
+        for page in pages:
+            # Skip internal links if not requested
+            if not include_internal_links and page['lru'] in we_lrus:
+                continue
+                
+            page_data = {
+                'url': page['url'],
+                'lru': page['lru'],
+                'target_lrus': [lru for lru in page.get('lrulinks', []) if lru in we_lrus]
+            }
+            if include_page_metas:
+                page_data.update({
+                    'status': page.get('status'),
+                    'crawl_timestamp': str(page.get('timestamp', '')),
+                    'depth': page.get('depth'),
+                    'content_type': page.get('content_type'),
+                    'size': page.get('size'),
+                    'encoding': page.get('encoding'),
+                    'error': page.get('error')
+                })
+            result_pages.append(page_data)
+        
+        logger.msg("...found %d backlinks" % len(result_pages), system="INFO - %s" % corpus)
+        returnD(format_result(result_pages))
 
   # CREATION RULES
 
@@ -3470,8 +3563,8 @@ class Memory_Structure(customJSONRPC):
 try:
     core = Core()
 except Exception as x:
-    print "ERROR: Cannot start API, something should probably not have been pushed..."
-    print type(x), x
+    print("ERROR: Cannot start API, something should probably not have been pushed...")
+    print(type(x), x)
     exit(1)
 
 def test_start(cor, corpus):
