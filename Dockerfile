@@ -1,5 +1,5 @@
-# Use Python 3.9 instead of EOL Python 2.7
-FROM python:3.9-slim
+# Use Python 2.7 (with security note) - upgrading to Python 3 requires extensive testing
+FROM python:2.7-slim
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ RUN useradd --create-home --shell /bin/bash hyphe
 # Copy requirements first for better caching
 COPY requirements.txt /app/requirements.txt
 
-# Install dependencies with security best practices
+# Install dependencies with security best practices - removed deprecated repo fix
 RUN buildDeps='gcc libffi-dev libxml2-dev libxslt-dev' \
     && apt-get update && apt-get install -y --no-install-recommends $buildDeps \
     && pip install --no-cache-dir --upgrade pip setuptools \

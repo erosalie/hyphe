@@ -33,10 +33,10 @@ def safe_literal_eval(value, default=None):
         if isinstance(result, (list, dict, tuple, str, int, float, bool, type(None))):
             return result
         else:
-            print(f"Warning: Unsafe type {type(result)} in environment variable, using default", file=sys.stderr)
+            print("Warning: Unsafe type %s in environment variable, using default" % type(result))
             return default
     except (ValueError, SyntaxError) as e:
-        print(f"Warning: Invalid literal in environment variable: {e}, using default", file=sys.stderr)
+        print("Warning: Invalid literal in environment variable: %s, using default" % e)
         return default
 
 def strToBool(string):
@@ -89,10 +89,7 @@ writeConfig(configfile, configdata)
 
 # Use subprocess instead of os.system for security
 try:
-    subprocess.run(["/app/hyphe_backend/core.tac"], check=True)
-except subprocess.CalledProcessError as e:
-    print(f"Error starting hyphe backend: {e}", file=sys.stderr)
-    sys.exit(1)
-except FileNotFoundError:
-    print("Error: /app/hyphe_backend/core.tac not found", file=sys.stderr)
+    subprocess.call(["/app/hyphe_backend/core.tac"])
+except OSError as e:
+    print("Error starting hyphe backend: %s" % e)
     sys.exit(1)
